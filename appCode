@@ -1,1 +1,66 @@
+#
+# This is a Shiny web application. You can run the application by clicking
+# the 'Run App' button above.
+#
+# Find out more about building applications with Shiny here:
+#
+#    http://shiny.rstudio.com/
+#
 
+library(shiny)
+library(tidyverse)
+library(httr)
+library(lubridate)
+library(jsonlite)
+
+response <- httr::GET(url = "https://api.covid19api.com/all")
+
+content <- rawToChar(response$content)
+covidCountry <- data.frame(fromJSON(content))
+
+covidCountry %>% 
+  mutate(Date = str_remove_all(covidCountry$Date, pattern = "T00:00:00Z"))
+
+covidCountryNum <- covidCountry %>% 
+  select(Deaths, Confirmed, Active, Recovered)
+
+# Define UI for application that draws a histogram
+ui <- fluidPage(
+
+    titlePanel("Covid Data"),
+    
+    sidebarLayout(
+      sidebarPanel(
+        
+        selectInput("country", "Select box", 
+                          levels(covidCountry$Country)),
+        
+        checkboxGroupInput("var", 
+                           "Choose Variables for Data Table:", 
+                           choices = c(colnames(covidCountryNum)),
+                           selected =  "Confirmed"),
+        
+        dateInput("date", 
+                  "Date input", 
+                  value = "2020-01-22"),
+
+      ), 
+     mainPanel(
+           dataTableOutput("table"))
+)
+
+)
+
+# Define server logic required to draw a histogram
+server <- function(input, output) {
+
+  covidtable <- reactive({filter(covidCountry, Country == input$country) %>% select(input$var, input$date)}) 
+  
+  
+  output$table <- renderDataTable(
+    covidtable())
+  
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)
